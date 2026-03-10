@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plate Inventory Management System</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#eef2f7;
+padding:20px;
+}
+
+h2{
+text-align:center;
+margin-bottom:20px;
+}
+
+.controls{
+display:flex;
+flex-wrap:wrap;
+gap:10px;
+margin-bottom:15px;
+}
+
+button{
+padding:8px 14px;
+border:none;
+border-radius:4px;
+cursor:pointer;
+}
+
+.add{background:#27ae60;color:white;}
+.export{background:#8e44ad;color:white;}
+.clear{background:#e67e22;color:white;}
+.edit{background:#3498db;color:white;}
+.delete{background:#c0392b;color:white;}
+
+input,select{
+padding:7px;
+border-radius:4px;
+border:1px solid #ccc;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:8px;
+text-align:center;
+}
+
+th{
+background:#2c3e50;
+color:white;
+}
+
+.modal{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.4);
+justify-content:center;
+align-items:center;
+}
+
+.modal-content{
+background:white;
+padding:20px;
+width:380px;
+border-radius:6px;
+}
+
+.row{
+margin-bottom:10px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>Plate Inventory Management System</h2>
+
+<div class="controls">
+
+<button class="add" onclick="openForm()">Add Plate</button>
+
+<button class="export" onclick="exportExcel()">Export Excel</button>
+
+<input id="searchInput" placeholder="Search Grade / Location" oninput="loadData()">
+
+<select id="gradeFilter" onchange="loadData()">
+<option value="">All Grades</option>
+</select>
+
+<select id="sortField" onchange="sortData()">
+<option value="">Sort By</option>
+<option value="thickness">Thickness</option>
+<option value="length">Length</option>
+<option value="width">Width</option>
+</select>
+
+<select id="sortOrder" onchange="sortData()">
+<option value="asc">Ascending</option>
+<option value="desc">Descending</option>
+</select>
+
+</div>
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Grade</th>
+<th>Thickness</th>
+<th>Length</th>
+<th>Width</th>
+<th>Location</th>
+<th>Remark</th>
+<th>Action</th></tr>
+
+</thead>
+
+<tbody id="tableBody"></tbody>
+
+</table>
+
+<div class="modal" id="formModal">
+
+<div class="modal-content">
+
+<h3>Add Plate</h3>
+
+<div class="row">
+<input id="gradeInput" placeholder="Grade">
+</div>
+
+<div class="row">
+<input id="thicknessInput" type="number" placeholder="Thickness">
+</div>
+
+<div class="row">
+<input id="lengthInput" type="number" placeholder="Length">
+</div>
+
+<div class="row">
+<input id="widthInput" type="number" placeholder="Width">
+</div>
+
+<div class="row">
+<input id="locationInput" placeholder="Location">
+</div>
+
+<div class="row">
+<input id="remarkInput" placeholder="Remark">
+</div>
+
+<button class="add" onclick="savePlate()">Save</button>
+<button onclick="closeForm()">Cancel</button>
+
+</div>
+
+</div>
+
+<script>
+
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbxpyj0e31-oUIpfjvsl_hgIklXO29xnxUJ4qWcNiwZQRzj2Vw3Fu4fK_dVu5NECsEwhUQ/exec"
+
+const tableBody=document.getElementById("tableBody")
+const formModal=document.getElementById("formModal")
+
+let plates=[]
+
+loadData()
+
+function loadData(){
+
+fetch(SCRIPT_URL)
+
+.then(res=>res.json())
+
+.then(data=>{
+
+plates=data.map(r=>({
+id:r[0],
+grade:r[1],
+thickness:r[2],
+length:r[3],
+width:r[4],
+location:r[5],
+remark:r[6]
+}))
+
+displayData()
+
+updateGradeFilter()
+
+})
+
+}
+
+function displayData(){
+
+const search=document.getElementById("searchInput").value.toLowerCase()
+const gradeFilter=document.getElementById("gradeFilter").value
+
+tableBody.innerHTML=""
+
+plates.filter(p=>{
+return(
+(!search||`${p.grade} ${p.location}`.toLowerCase().includes(search))
+&&(!gradeFilter||p.grade===gradeFilter)
+)
+})
+
+.forEach((p)=>{
+
+tableBody.innerHTML+=`
+
+<tr>
+
+<td>${p.id}</td>
+<td>${p.grade}</td>
+<td>${p.thickness}</td>
+<td>${p.length}</td>
+<td>${p.width}</td>
+<td>${p.location}</td>
+<td>${p.remark}</td>
+
+<td>
+
+<button class="edit" onclick="editPlate('${p.id}')">Edit</button>
+
+<button class="delete" onclick="deletePlate('${p.id}')">Delete</button>
+
+</td>
+
+</tr>
+
+`
+
+})
+
+}
+
+function updateGradeFilter(){
+
+const grades=[...new Set(plates.map(p=>p.grade))]
+
+const gradeFilter=document.getElementById("gradeFilter")
+
+gradeFilter.innerHTML='<option value="">All Grades</option>'
+
+grades.forEach(g=>{
+gradeFilter.innerHTML+=`<option>${g}</option>`
+})
+
+}
+
+function sortData(){
+
+const field=document.getElementById("sortField").value
+const order=document.getElementById("sortOrder").value
+
+if(!field)return
+
+plates.sort((a,b)=>{
+
+const v1=Number(a[field])||0
+const v2=Number(b[field])||0
+
+return order==="asc"?v1-v2:v2-v1
+
+})
+
+displayData()
+
+}
+
+function openForm(){
+
+document.getElementById("gradeInput").value=""
+document.getElementById("thicknessInput").value=""
+document.getElementById("lengthInput").value=""
+document.getElementById("widthInput").value=""
+document.getElementById("locationInput").value=""
+document.getElementById("remarkInput").value=""
+
+formModal.style.display="flex"
+
+}
+
+function closeForm(){
+
+formModal.style.display="none"
+
+}
+
+function savePlate(){
+
+if(!document.getElementById("gradeInput").value.trim()){
+
+alert("Grade Required")
+return
+
+}
+
+const data={
+
+id:"PL-"+Date.now(),
+
+grade:document.getElementById("gradeInput").value,
+thickness:document.getElementById("thicknessInput").value,
+length:document.getElementById("lengthInput").value,
+width:document.getElementById("widthInput").value,
+location:document.getElementById("locationInput").value,
+remark:document.getElementById("remarkInput").value
+
+}
+
+fetch(SCRIPT_URL,{
+method:"POST",
+body:JSON.stringify(data)
+})
+.then(res=>res.text())
+.then(()=>{
+
+alert("Saved Successfully")
+
+closeForm()
+
+loadData()
+
+})
+
+}
+
+function exportExcel(){
+
+let csv="ID,Grade,Thickness,Length,Width,Location,Remark\n"
+
+plates.forEach(p=>{
+
+csv+=`${p.id},${p.grade},${p.thickness},${p.length},${p.width},${p.location},${p.remark}\n`
+
+})
+
+const blob=new Blob([csv])
+
+const a=document.createElement("a")
+
+a.href=URL.createObjectURL(blob)
+
+a.download="plates.csv"
+
+a.click()
+
+}
+
+</script>
+
+</body>
+</html>
