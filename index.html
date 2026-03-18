@@ -33,7 +33,6 @@ cursor:pointer;
 
 .add{background:#27ae60;color:white;}
 .export{background:#8e44ad;color:white;}
-.clear{background:#e67e22;color:white;}
 .edit{background:#3498db;color:white;}
 .delete{background:#c0392b;color:white;}
 
@@ -90,7 +89,6 @@ margin-bottom:10px;
 <div class="controls">
 
 <button class="add" onclick="openForm()">Add Plate</button>
-
 <button class="export" onclick="exportExcel()">Export Excel</button>
 
 <input id="searchInput" placeholder="Search Grade / Location" oninput="loadData()">
@@ -116,7 +114,6 @@ margin-bottom:10px;
 <table>
 
 <thead>
-
 <tr>
 <th>ID</th>
 <th>Grade</th>
@@ -125,8 +122,8 @@ margin-bottom:10px;
 <th>Width</th>
 <th>Location</th>
 <th>Remark</th>
-<th>Action</th></tr>
-
+<th>Action</th>
+</tr>
 </thead>
 
 <tbody id="tableBody"></tbody>
@@ -137,7 +134,7 @@ margin-bottom:10px;
 
 <div class="modal-content">
 
-<h3>Add Plate</h3>
+<h3>Add / Edit Plate</h3>
 
 <div class="row">
 <input id="gradeInput" placeholder="Grade">
@@ -172,14 +169,24 @@ margin-bottom:10px;
 
 <script>
 
-const SCRIPT_URL="https://script.google.com/macros/s/AKfycbxpyj0e31-oUIpfjvsl_hgIklXO29xnxUJ4qWcNiwZQRzj2Vw3Fu4fK_dVu5NECsEwhUQ/exec"
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbwedvDEPc3UyRxz7ZIgx_ZYk878u6-n1fZIo2vgagF_uHQKKkPJK6XeWxU_ie_HcUCmpw/exec"
 
-const tableBody=document.getElementById("tableBody")
-const formModal=document.getElementById("formModal")
+let tableBody
+let formModal
 
 let plates=[]
+let editingID=null
+
+window.onload = function(){
+
+tableBody = document.getElementById("tableBody")
+formModal = document.getElementById("formModal")
+
+console.log("JS Loaded ✅")
 
 loadData()
+
+}
 
 function loadData(){
 
@@ -200,7 +207,6 @@ remark:r[6]
 }))
 
 displayData()
-
 updateGradeFilter()
 
 })
@@ -236,11 +242,8 @@ tableBody.innerHTML+=`
 <td>${p.remark}</td>
 
 <td>
-
 <button class="edit" onclick="editPlate('${p.id}')">Edit</button>
-
 <button class="delete" onclick="deletePlate('${p.id}')">Delete</button>
-
 </td>
 
 </tr>
@@ -287,6 +290,8 @@ displayData()
 
 function openForm(){
 
+editingID=null
+
 document.getElementById("gradeInput").value=""
 document.getElementById("thicknessInput").value=""
 document.getElementById("lengthInput").value=""
@@ -299,68 +304,111 @@ formModal.style.display="flex"
 }
 
 function closeForm(){
-
 formModal.style.display="none"
+}
+
+function editPlate(id){
+
+const record=plates.find(p=>p.id===id)
+
+if(!record)return
+
+editingID=id
+
+document.getElementById("gradeInput").value=record.grade
+document.getElementById("thicknessInput").value=record.thickness
+document.getElementById("lengthInput").value=record.length
+document.getElementById("widthInput").value=record.width
+document.getElementById("locationInput").value=record.location
+document.getElementById("remarkInput").value=record.remark
+
+formModal.style.display="flex"
+
+}
+
+function deletePlate(id){
+
+if(!confirm("Are you sure you want to delete?")) return;
+
+fetch(SCRIPT_URL + "?action=delete&id=" + encodeURIComponent(id))
+.then(res => res.text())
+.then(msg => {
+
+console.log("DELETE RESPONSE:", msg);
+
+if(msg.toLowerCase().includes("deleted")){
+    alert("Deleted Successfully");
+    loadData(); // refresh table
+}else{
+    alert("Delete failed: " + msg);
+}
+
+})
+.catch(err=>{
+console.error(err);
+alert("Error deleting data");
+});
 
 }
 
 function savePlate(){
 
 if(!document.getElementById("gradeInput").value.trim()){
-
 alert("Grade Required")
 return
-
 }
 
-const data={
+let id = editingID ? editingID : "PL-" + Date.now()
 
-id:"PL-"+Date.now(),
+let grade = document.getElementById("gradeInput").value
+let thickness = document.getElementById("thicknessInput").value
+let length = document.getElementById("lengthInput").value
+let width = document.getElementById("widthInput").value
+let location = document.getElementById("locationInput").value
+let remark = document.getElementById("remarkInput").value
 
-grade:document.getElementById("gradeInput").value,
-thickness:document.getElementById("thicknessInput").value,
-length:document.getElementById("lengthInput").value,
-width:document.getElementById("widthInput").value,
-location:document.getElementById("locationInput").value,
-remark:document.getElementById("remarkInput").value
+let url = SCRIPT_URL +
+"?action=" + (editingID ? "update" : "add") +
+"&id=" + encodeURIComponent(id) +
+"&grade=" + encodeURIComponent(grade) +
+"&thickness=" + encodeURIComponent(thickness) +
+"&length=" + encodeURIComponent(length) +
+"&width=" + encodeURIComponent(width) +
+"&location=" + encodeURIComponent(location) +
+"&remark=" + encodeURIComponent(remark)
 
-}
+// ✅ NO REDIRECT — USE FETCH
+fetch(url)
+.then(res => res.text())
+.then(msg => {
 
-fetch(SCRIPT_URL,{
-method:"POST",
-body:JSON.stringify(data)
-})
-.then(res=>res.text())
-.then(()=>{
+alert(editingID ? "Updated Successfully" : "Saved Successfully")
 
-alert("Saved Successfully")
-
+editingID = null
 closeForm()
-
 loadData()
 
 })
+.catch(err=>{
+alert("Error saving data")
+})
 
 }
+
 
 function exportExcel(){
 
 let csv="ID,Grade,Thickness,Length,Width,Location,Remark\n"
 
 plates.forEach(p=>{
-
 csv+=`${p.id},${p.grade},${p.thickness},${p.length},${p.width},${p.location},${p.remark}\n`
-
 })
 
 const blob=new Blob([csv])
-
 const a=document.createElement("a")
 
 a.href=URL.createObjectURL(blob)
-
 a.download="plates.csv"
-
 a.click()
 
 }
